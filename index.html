@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="한자 분석">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>한자 분석기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f5; color: #1a1a1a; }
+
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* === SETUP SCREEN === */
+  #setup { align-items: center; justify-content: center; padding: 2rem; background: #fff; }
+  .setup-logo { font-size: 56px; margin-bottom: 1.5rem; }
+  .setup-title { font-size: 24px; font-weight: 600; margin-bottom: 0.5rem; color: #1a1a1a; }
+  .setup-sub { font-size: 14px; color: #888; margin-bottom: 2.5rem; text-align: center; }
+  .setup-label { font-size: 13px; color: #555; margin-bottom: 8px; align-self: flex-start; width: 100%; max-width: 340px; }
+  .setup-input {
+    width: 100%; max-width: 340px; padding: 14px 16px;
+    border: 1.5px solid #e0e0e0; border-radius: 12px;
+    font-size: 14px; font-family: monospace; color: #1a1a1a;
+    background: #fafafa; margin-bottom: 1rem;
+    outline: none;
+  }
+  .setup-input:focus { border-color: #534AB7; background: #fff; }
+  .btn-start {
+    width: 100%; max-width: 340px; padding: 16px;
+    background: #534AB7; color: white; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-start:active { background: #3C3489; }
+  .setup-note { font-size: 12px; color: #aaa; margin-top: 1rem; text-align: center; max-width: 300px; line-height: 1.6; }
+
+  /* === MAIN SCREEN === */
+  #main { background: #f7f7f5; }
+
+  .topbar {
+    background: #fff; padding: 16px 20px 12px;
+    border-bottom: 0.5px solid #e8e8e8;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-title { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+  .topbar-settings { font-size: 22px; cursor: pointer; color: #888; padding: 4px; }
+
+  .main-content { flex: 1; padding: 20px 16px; overflow-y: auto; }
+
+  /* Camera / Upload zone */
+  .upload-zone {
+    background: #fff; border-radius: 20px;
+    border: 2px dashed #d0cdf0;
+    padding: 32px 20px; text-align: center;
+    cursor: pointer; margin-bottom: 16px;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .upload-zone:active { background: #f5f4ff; border-color: #534AB7; }
+  .upload-zone.dragging { background: #f5f4ff; border-color: #534AB7; }
+  .upload-icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-text { font-size: 16px; font-weight: 500; color: #534AB7; margin-bottom: 6px; }
+  .upload-sub { font-size: 13px; color: #aaa; }
+  #fileInput { display: none; }
+
+  /* Preview */
+  .preview-wrap { margin-bottom: 16px; position: relative; display: none; }
+  .preview-wrap.show { display: block; }
+  .preview-img { width: 100%; max-height: 280px; object-fit: contain; border-radius: 16px; background: #fff; border: 0.5px solid #e8e8e8; }
+  .preview-clear {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.5); color: white; border: none;
+    width: 30px; height: 30px; border-radius: 50%; font-size: 16px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Analyze button */
+  .btn-analyze {
+    width: 100%; padding: 18px; background: #534AB7; color: white;
+    border: none; border-radius: 16px; font-size: 17px; font-weight: 600;
+    cursor: pointer; margin-bottom: 20px; display: none;
+    transition: background 0.15s; letter-spacing: -0.2px;
+  }
+  .btn-analyze.show { display: block; }
+  .btn-analyze:active { background: #3C3489; }
+  .btn-analyze:disabled { background: #b0acd8; cursor: default; }
+
+  /* Loading */
+  .loading { display: none; text-align: center; padding: 2rem; }
+  .loading.show { display: block; }
+  .loading-spinner {
+    width: 36px; height: 36px; border: 3px solid #e0dff8;
+    border-top-color: #534AB7; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: #888; }
+
+  /* Result */
+  .result { display: none; }
+  .result.show { display: block; }
+
+  .result-kanji-card {
+    background: #fff; border-radius: 20px; padding: 24px 20px;
+    margin-bottom: 12px; border: 0.5px solid #ebebeb;
+  }
+  .kanji-display { font-size: 64px; text-align: center; line-height: 1.1; margin-bottom: 16px; color: #1a1a1a; }
+  .kanji-reading { text-align: center; font-size: 18px; color: #534AB7; font-weight: 500; margin-bottom: 6px; }
+  .kanji-meaning { text-align: center; font-size: 15px; color: #555; margin-bottom: 16px; }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .tag {
+    font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 500;
+  }
+  .tag-radical { background: #E1F5EE; color: #085041; }
+  .tag-stroke { background: #EEEDFE; color: #3C3489; }
+  .tag-level { background: #FAEEDA; color: #633806; }
+
+  .info-card {
+    background: #fff; border-radius: 16px; padding: 18px 20px;
+    margin-bottom: 12px; border: 0.5px solid #ebebeb;
+  }
+  .info-card-title {
+    font-size: 11px; font-weight: 600; color: #aaa;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .info-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
+  .info-dot { width: 6px; height: 6px; border-radius: 50%; background: #534AB7; margin-top: 6px; flex-shrink: 0; }
+  .info-text { font-size: 14px; color: #333; line-height: 1.6; }
+  .info-text .jp { color: #534AB7; font-weight: 500; }
+  .info-text .kr { color: #888; font-size: 13px; }
+
+  .similar-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .similar-item {
+    background: #f7f7f5; border-radius: 14px; padding: 14px 12px;
+    text-align: center; cursor: pointer; border: 1.5px solid transparent;
+    transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .similar-item:active { background: #EEEDFE; border-color: #AFA9EC; }
+  .similar-kanji { font-size: 30px; color: #1a1a1a; display: block; }
+  .similar-read { font-size: 12px; color: #534AB7; font-weight: 500; }
+  .similar-meaning { font-size: 12px; color: #888; }
+  .similar-diff { font-size: 11px; color: #aaa; margin-top: 2px; line-height: 1.4; }
+  .similar-arrow { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  .btn-reset {
+    width: 100%; padding: 14px; background: transparent; color: #534AB7;
+    border: 1.5px solid #534AB7; border-radius: 14px; font-size: 15px;
+    font-weight: 500; cursor: pointer; margin-top: 4px; margin-bottom: 24px;
+  }
+  .btn-reset:active { background: #f0efff; }
+
+  /* Error */
+  .error-box {
+    background: #FCEBEB; color: #791F1F; border-radius: 12px;
+    padding: 14px 16px; font-size: 14px; margin-bottom: 16px;
+    line-height: 1.6; display: none;
+  }
+  .error-box.show { display: block; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup" class="screen active">
+  <div class="setup-logo">漢</div>
+  <div class="setup-title">한자 분석기</div>
+  <div class="setup-sub">사진 한 장으로 한자를 완전히 이해해요</div>
+  <div class="setup-label">Anthropic API 키를 입력해주세요</div>
+  <input class="setup-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+  <button class="btn-start" onclick="saveAndStart()">시작하기</button>
+  <div class="setup-note">API 키는 이 기기에만 저장되며 외부로 전송되지 않아요. console.anthropic.com에서 발급받을 수 있어요.</div>
+</div>
+
+<!-- MAIN SCREEN -->
+<div id="main" class="screen">
+  <div class="topbar">
+    <span class="topbar-title">漢 한자 분석기</span>
+    <span class="topbar-settings" onclick="goSetup()" title="API 키 변경">⚙️</span>
+  </div>
+
+  <div class="main-content">
+
+    <!-- Upload zone -->
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📷</div>
+      <div class="upload-text">사진 찍기 또는 이미지 선택</div>
+      <div class="upload-sub">한자가 포함된 사진을 올려주세요</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
+
+    <!-- Preview -->
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" class="preview-img" alt="선택된 이미지">
+      <button class="preview-clear" onclick="clearImage()">✕</button>
+    </div>
+
+    <!-- Error -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- Analyze button -->
+    <button class="btn-analyze" id="analyzeBtn" onclick="analyze()">이 한자 분석하기 →</button>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">한자를 분석하는 중...</div>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="result"></div>
+
+  </div>
+</div>
+
+<script>
+var apiKey = '';
+var imageBase64 = '';
+var imageMime = 'image/jpeg';
+
+function saveAndStart() {
+  var key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-ant-')) {
+    alert('올바른 API 키를 입력해주세요. (sk-ant- 로 시작)');
+    return;
+  }
+  apiKey = key;
+  localStorage.setItem('kanji_api_key', key);
+  showScreen('main');
+}
+
+function goSetup() {
+  showScreen('setup');
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+// Load saved key
+window.addEventListener('load', function() {
+  var saved = localStorage.getItem('kanji_api_key');
+  if (saved) {
+    apiKey = saved;
+    document.getElementById('apiKeyInput').value = saved;
+    showScreen('main');
+  }
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function() {});
+  }
+});
+
+// File input
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  loadFile(file);
+});
+
+// Drag and drop
+var zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragging'); });
+zone.addEventListener('dragleave', function() { zone.classList.remove('dragging'); });
+zone.addEventListener('drop', function(e) {
+  e.preventDefault(); zone.classList.remove('dragging');
+  var file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadFile(file);
+});
+
+function loadFile(file) {
+  imageMime = file.type || 'image/jpeg';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataUrl = e.target.result;
+    imageBase64 = dataUrl.split(',')[1];
+    document.getElementById('previewImg').src = dataUrl;
+    document.getElementById('previewWrap').classList.add('show');
+    document.getElementById('analyzeBtn').classList.add('show');
+    document.getElementById('result').classList.remove('show');
+    document.getElementById('errorBox').classList.remove('show');
+    document.getElementById('result').innerHTML = '';
+  };
+  reader.readAsDataURL(file);
+  // Reset input so same file can be re-selected
+  document.getElementById('fileInput').value = '';
+}
+
+function clearImage() {
+  imageBase64 = '';
+  document.getElementById('previewWrap').classList.remove('show');
+  document.getElementById('analyzeBtn').classList.remove('show');
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('errorBox').classList.remove('show');
+  document.getElementById('result').innerHTML = '';
+}
+
+async function analyze() {
+  if (!imageBase64) return;
+  var btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('errorBox').classList.remove('show');
+
+  var systemPrompt = '당신은 한자 전문가입니다. 이미지에서 한자를 인식하고 분석합니다. 반드시 JSON만 출력하고 다른 텍스트는 절대 포함하지 마세요. 마크다운 코드블록도 사용하지 마세요.';
+
+  var userPrompt = '이 이미지에 있는 한자(들)를 분석해주세요. 가장 두드러진 한자 1-3개를 골라 분석하세요.\n\nJSON 형식:\n{\n  "characters": [\n    {\n      "kanji": "한자",\n      "readings": {"onyomi": ["음독(들)"], "kunyomi": ["훈독(들)"]},\n      "meanings": ["한국어 뜻1", "뜻2"],\n      "radical": {"char": "부수 한자", "name": "부수 이름", "meaning": "부수 뜻"},\n      "stroke_count": 획수,\n      "jlpt_level": "N5/N4/N3/N2/N1/없음",\n      "example_words": [\n        {"word": "예시단어", "reading": "읽기", "meaning": "뜻"},\n        {"word": "예시단어2", "reading": "읽기2", "meaning": "뜻2"},\n        {"word": "예시단어3", "reading": "읽기3", "meaning": "뜻3"}\n      ],\n      "similar_kanji": [\n        {"kanji": "비슷한한자", "reading": "읽기", "meanings": ["뜻1", "뜻2"], "difference": "이 한자와 헷갈리는 이유 또는 차이점 (한국어 1문장)"},\n        {"kanji": "비슷한한자2", "reading": "읽기2", "meanings": ["뜻1"], "difference": "차이점"}\n      ],\n      "tip": "이 한자를 기억하는 쉬운 팁 (한국어, 1-2문장)"\n    }\n  ]\n}';
+
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-6',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageBase64 } },
+            { type: 'text', text: userPrompt }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      var errData = await res.json();
+      throw new Error(errData.error ? errData.error.message : 'API 오류 ' + res.status);
+    }
+
+    var data = await res.json();
+    var text = data.content[0].text.trim();
+    var parsed = JSON.parse(text);
+    renderResult(parsed);
+
+  } catch(e) {
+    document.getElementById('errorBox').textContent = '오류: ' + e.message + '\nAPI 키를 확인하거나 다시 시도해주세요.';
+    document.getElementById('errorBox').classList.add('show');
+  }
+
+  document.getElementById('loading').classList.remove('show');
+  btn.disabled = false;
+}
+
+async function analyzeKanjiText(kanji) {
+  // 화면 상단으로 스크롤 후 로딩 표시
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('result').innerHTML = '';
+  document.getElementById('errorBox').classList.remove('show');
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('loading').querySelector('.loading-text').textContent = kanji + ' 분석 중...';
+  document.getElementById('loading').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  var systemPrompt = '당신은 한자 전문가입니다. 반드시 JSON만 출력하고 다른 텍스트나 마크다운 코드블록은 절대 포함하지 마세요.';
+  var userPrompt = '"' + kanji + '" 한자를 상세히 분석해주세요.\n\nJSON 형식:\n{\n  "characters": [\n    {\n      "kanji": "' + kanji + '",\n      "readings": {"onyomi": ["음독들"], "kunyomi": ["훈독들"]},\n      "meanings": ["한국어 뜻1", "뜻2"],\n      "radical": {"char": "부수", "name": "부수 이름", "meaning": "뜻"},\n      "stroke_count": 획수,\n      "jlpt_level": "N5/N4/N3/N2/N1/없음",\n      "example_words": [\n        {"word": "예시단어", "reading": "읽기", "meaning": "뜻"},\n        {"word": "예시단어2", "reading": "읽기2", "meaning": "뜻2"},\n        {"word": "예시단어3", "reading": "읽기3", "meaning": "뜻3"}\n      ],\n      "similar_kanji": [\n        {"kanji": "비슷한한자", "reading": "읽기", "meanings": ["뜻"], "difference": "차이점 (한국어 1문장)"},\n        {"kanji": "비슷한한자2", "reading": "읽기2", "meanings": ["뜻"], "difference": "차이점"}\n      ],\n      "tip": "이 한자를 기억하는 쉬운 팁 (한국어 1-2문장)"\n    }\n  ]\n}';
+
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-6',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+    if (!res.ok) { var e = await res.json(); throw new Error(e.error ? e.error.message : 'API 오류'); }
+    var data = await res.json();
+    var parsed = JSON.parse(data.content[0].text.trim());
+    renderResult(parsed, true);
+  } catch(e) {
+    document.getElementById('errorBox').textContent = '오류: ' + e.message;
+    document.getElementById('errorBox').classList.add('show');
+  }
+  document.getElementById('loading').classList.remove('show');
+  document.getElementById('loading').querySelector('.loading-text').textContent = '한자를 분석하는 중...';
+}
+
+function renderResult(data, fromText) {
+  var chars = data.characters || [];
+  if (!chars.length) {
+    document.getElementById('errorBox').textContent = '이미지에서 한자를 찾지 못했어요. 한자가 잘 보이는 사진을 다시 찍어주세요.';
+    document.getElementById('errorBox').classList.add('show');
+    return;
+  }
+
+  var html = '';
+  chars.forEach(function(c) {
+    var readings = [];
+    if (c.readings && c.readings.onyomi && c.readings.onyomi.length) readings.push('음독: ' + c.readings.onyomi.join('、'));
+    if (c.readings && c.readings.kunyomi && c.readings.kunyomi.length) readings.push('훈독: ' + c.readings.kunyomi.join('、'));
+
+    var examplesHtml = (c.example_words || []).map(function(w) {
+      return '<div class="info-row"><div class="info-dot"></div><div class="info-text"><span class="jp">' + w.word + '（' + w.reading + '）</span> <span class="kr">— ' + w.meaning + '</span></div></div>';
+    }).join('');
+
+    var similarHtml = '';
+    if (c.similar_kanji && c.similar_kanji.length) {
+      var items = c.similar_kanji.slice(0, 4).map(function(s) {
+        var meaning = (s.meanings && s.meanings.length) ? s.meanings.slice(0,2).join(', ') : '';
+        var safeKanji = s.kanji.replace(/'/g, "\\'");
+        return '<div class="similar-item" onclick="analyzeKanjiText(\'' + safeKanji + '\')">' +
+          '<span class="similar-kanji">' + s.kanji + '</span>' +
+          '<span class="similar-read">' + s.reading + '</span>' +
+          (meaning ? '<span class="similar-meaning">' + meaning + '</span>' : '') +
+          (s.difference ? '<span class="similar-diff">' + s.difference + '</span>' : '') +
+          '<span class="similar-arrow">탭해서 분석 →</span>' +
+        '</div>';
+      }).join('');
+      similarHtml = '<div class="info-card"><div class="info-card-title">비슷한 한자 — 탭하면 분석해요</div><div class="similar-grid">' + items + '</div></div>';
+    }
+
+    var tipHtml = c.tip ? '<div class="info-card"><div class="info-card-title">기억 팁</div><div class="info-text" style="font-size:14px;color:#333;line-height:1.7">💡 ' + c.tip + '</div></div>' : '';
+
+    html += '<div class="result-kanji-card">' +
+      '<div class="kanji-display">' + c.kanji + '</div>' +
+      '<div class="kanji-reading">' + readings.join('　') + '</div>' +
+      '<div class="kanji-meaning">' + (c.meanings || []).join(', ') + '</div>' +
+      '<div class="tag-row">' +
+        '<span class="tag tag-radical">부수: ' + (c.radical ? c.radical.char + ' ' + c.radical.name : '—') + '</span>' +
+        '<span class="tag tag-stroke">' + (c.stroke_count || '?') + '획</span>' +
+        (c.jlpt_level && c.jlpt_level !== '없음' ? '<span class="tag tag-level">JLPT ' + c.jlpt_level + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    (examplesHtml ? '<div class="info-card"><div class="info-card-title">예시 단어</div>' + examplesHtml + '</div>' : '') +
+    similarHtml +
+    tipHtml;
+  });
+
+  html += fromText
+    ? '<button class="btn-reset" onclick="document.getElementById(\'result\').classList.remove(\'show\'); document.getElementById(\'previewWrap\').classList.contains(\'show\') ? document.getElementById(\'analyzeBtn\').classList.add(\'show\') : null; window.scrollTo(0,0)">← 결과로 돌아가기</button>'
+    : '<button class="btn-reset" onclick="clearImage()">다른 사진 분석하기</button>';
+
+  var resultEl = document.getElementById('result');
+  resultEl.innerHTML = html;
+  resultEl.classList.add('show');
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>
