@@ -1,5 +1,6 @@
-const CACHE = 'kanji-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE = 'kanji-v2';
+const BASE = '/kanji-app';
+const ASSETS = [BASE + '/', BASE + '/index.html', BASE + '/manifest.json'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -21,7 +22,7 @@ self.addEventListener('fetch', function(e) {
   if (e.request.url.includes('api.anthropic.com')) return;
   e.respondWith(
     caches.match(e.request).then(function(cached) {
-      return cached || fetch(e.request).catch(function() { return caches.match('/index.html'); });
+      return cached || fetch(e.request).catch(function() { return caches.match(BASE + '/index.html'); });
     })
   );
 });
