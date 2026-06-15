@@ -1,25 +1,13 @@
 {
   "name": "한자 분석기",
   "short_name": "한자",
-  "description": "사진으로 한자를 분석해주는 앱",
-  "start_url": "/kanji-app/index.html",
-  "scope": "/kanji-app/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#534AB7",
-  "orientation": "portrait",
   "icons": [
-    {
-      "src": "/kanji-app/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/kanji-app/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
